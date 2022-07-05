@@ -1,4 +1,4 @@
-package com.joshlong.youtubeingest;
+package com.joshlong.youtube;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

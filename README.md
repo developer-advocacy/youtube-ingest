@@ -1,2 +1,3 @@
-# youtube-ingest
-this module ingests data about our various videos
+# Youtube Ingest
+
+This module ingests data about videos on YouTube.
