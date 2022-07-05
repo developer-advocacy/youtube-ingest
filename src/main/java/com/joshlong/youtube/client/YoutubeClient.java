@@ -1,7 +1,12 @@
 package com.joshlong.youtube.client;
 
+import java.util.List;
+import java.util.Map;
+
 /**
- * A simple YouTube client
+ * A simple YouTube client for the APIs
+ * <a href="https://developers.google.com/youtube/v3/docs/channels/list">I need from the
+ * YouTube API</a>.
  *
  * @author Josh Long
  */
@@ -24,5 +29,9 @@ public interface YoutubeClient {
 	 * channel
 	 */
 	Channel getChannelById(String channelId);
+
+	Map<String, Video> getVideosByIds(List<String> videoIds);
+
+	Video getVideoById(String videoId);
 
 }
