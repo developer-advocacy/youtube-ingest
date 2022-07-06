@@ -39,7 +39,6 @@ class DefaultYoutubeClientTest {
 
 	@Test
 	void videosByPlaylist() throws Exception {
-
 		var videos = this.youtubeClient.getVideosByPlaylist(playlistId, null).map(pv -> pv.videos().size());
 		StepVerifier.create(videos).expectNext(50).verifyComplete();
 
@@ -50,7 +49,6 @@ class DefaultYoutubeClientTest {
 
 	@Test
 	void allPlaylistsByChannel() throws Exception {
-
 		var channelName = "GoogleDevelopers";
 		var playlists = this.youtubeClient.getChannelByUsername(channelName)
 				.flatMapMany(channel -> this.youtubeClient.getAllPlaylistsByChannel(channel.channelId()));
