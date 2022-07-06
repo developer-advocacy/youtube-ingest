@@ -62,6 +62,6 @@ public interface YoutubeClient {
 	 * @param playlistId the id of the {@link Playlist } in which to find {@link Video}s
 	 * @return returns all the {@link Video}s for a given {@link Playlist}s.
 	 */
-	Flux<Video> getVideosByPlaylist(String playlistId);
+	Mono<PlaylistVideos> getVideosByPlaylist(String playlistId);
 
 }

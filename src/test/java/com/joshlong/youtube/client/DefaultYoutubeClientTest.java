@@ -24,9 +24,11 @@ class DefaultYoutubeClientTest {
 
 	@Test
 	void videosByPlaylist() throws Exception {
-		var playlistId = "PLgGXSWYM2FpNRPDQnAGfAHxMl3zUG2Run";
-		var videos = this.youtubeClient.getVideosByPlaylist(playlistId);
-		StepVerifier.create(videos).expectNextCount(8).verifyComplete();
+		var playlistId = "PLgGXSWYM2FpPw8rV0tZoMiJYSCiLhPnOc";
+		var videos = this.youtubeClient.getVideosByPlaylist(playlistId).map(pv -> pv.videos().size());
+		StepVerifier//
+				.create(videos)//
+				.expectNext(50).verifyComplete();
 	}
 
 	@Test
@@ -48,7 +50,6 @@ class DefaultYoutubeClientTest {
 
 	@Test
 	void channelByChannelId() throws Exception {
-
 		var channel = this.youtubeClient.getChannelById(this.channelId);
 		validateChannel(channel);
 	}

@@ -108,18 +108,22 @@ class DefaultYoutubeClient implements YoutubeClient {
 	}
 
 	@Override
-	public Flux<Video> getVideosByPlaylist(String playlistId) {
-		var url = "https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&key={key}&maxResults=50&playlistId={playlistId}";
+	public Mono<PlaylistVideos> getVideosByPlaylist(String playlistId) {
+		var url = "https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&key={key}&maxResults=500&playlistId={playlistId}";
 		return this.http.get().uri(url, Map.of("key", this.apiKey, "playlistId", playlistId)).retrieve()
-				.bodyToFlux(JsonNode.class).flatMap(jsonNode -> {
+				.bodyToFlux(JsonNode.class)//
+				.flatMap(jsonNode -> {//
+
 					var items = jsonNode.get("items");
 					var list = new ArrayList<String>();
 					for (var item : items)
 						list.add(item.get("contentDetails").get("videoId").textValue());
 					return getVideosByIds(list)//
-							.map(Map::values)//
-							.flatMapMany(Flux::fromIterable);
-				});
+							.map(Map::values)
+							.map(vl -> new PlaylistVideos(playlistId, vl, jsonNode.get("nextPageToken").textValue(),
+									null, jsonNode.get("pageInfo").get("totalResults").intValue()));
+
+				}).singleOrEmpty();
 	}
 
 	private Mono<Channel> findChannel(String username, String urlExtension, Map<String, String> params) {
@@ -159,4 +163,8 @@ class DefaultYoutubeClient implements YoutubeClient {
 		this.apiKey = apiKey;
 	}
 
+}
+
+record PlaylistVideos(String playlistId, Collection<Video> videos, String nextPageToken, String previousPageToken,
+		int totalResults) {
 }
