@@ -3,7 +3,6 @@ package com.joshlong.youtube.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.Assert;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
@@ -76,6 +75,40 @@ class DefaultYoutubeClient implements YoutubeClient {
 				.map(m -> m.get(videoId));
 	}
 
+	@SneakyThrows
+	private Playlist buildPlaylistForJsonNode(JsonNode jsonNode) {
+		var itemCount = jsonNode.get("contentDetails").get("itemCount").intValue();
+		var snippet = jsonNode.get("snippet");
+		var playlistId = jsonNode.get("id").textValue();
+		var title = snippet.get("title").textValue();
+		var description = snippet.get("description").textValue();
+		var publishedAt = buildDateFrom(snippet.get("publishedAt").textValue());
+		var channelId = snippet.get("channelId").textValue();
+		return new Playlist(playlistId, channelId, publishedAt, title, description, itemCount);
+	}
+
+	@Override
+	public Flux<Playlist> getPlaylistsForChannel(String channelId) {
+
+		var url = "https://youtube.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&channelId={channelId}&maxResults=50&key={key}";
+		return this.http.get()//
+				.uri(url, Map.of("channelId", channelId, "key", this.apiKey))//
+				.retrieve()//
+				.bodyToFlux(JsonNode.class)//
+				.flatMap(jn -> {
+					var list = new ArrayList<Playlist>();
+					for (var i : jn.get("items"))
+						list.add(buildPlaylistForJsonNode(i));
+					return Flux.fromIterable(list);
+				});
+	}
+
+	@Override
+	public Mono<Playlist> getPlaylistById(String playlistId) {
+		var url = "";
+		return null;
+	}
+
 	private Mono<Channel> findChannel(String username, String urlExtension, Map<String, String> params) {
 		var uri = "https://youtube.googleapis.com/youtube/v3/channels?part=snippet&key={key}" + urlExtension;
 		var uriVariables = new HashMap<String, String>();
@@ -108,7 +141,7 @@ class DefaultYoutubeClient implements YoutubeClient {
 		return Date.from(Instant.parse(isoDate));
 	}
 
-	DefaultYoutubeClient(WebClient http, @Value("${bootiful.youtube.api-key}") String apiKey) {
+	DefaultYoutubeClient(WebClient http, String apiKey) {
 		this.http = http;
 		this.apiKey = apiKey;
 	}

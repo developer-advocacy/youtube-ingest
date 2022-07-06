@@ -1,5 +1,6 @@
 package com.joshlong.youtube.client;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -13,6 +14,13 @@ import java.util.Map;
  * @author Josh Long
  */
 public interface YoutubeClient {
+
+	/**
+	 * Return the playlists
+	 * @param channelId the ID of the channel that we want to query
+	 * @return all the {@link Playlist}s for a given {@link Channel}
+	 */
+	Flux<Playlist> getPlaylistsForChannel(String channelId);
 
 	/**
 	 * Finds a youtube channel by the username that created it.
@@ -48,5 +56,7 @@ public interface YoutubeClient {
 	 * @return {@link Video} associated with the {@link String videoId}
 	 */
 	Mono<Video> getVideoById(String videoId);
+
+	Mono<Playlist> getPlaylistById(String playlistId);
 
 }

@@ -4,19 +4,33 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.util.List;
+import java.util.function.Predicate;
 
 @Slf4j
 @SpringBootTest
 class DefaultYoutubeClientTest {
 
+	private final String channelId = "UC7yfnfvEUlXUIfm8rGLwZdA";
+
 	private final YoutubeClient youtubeClient;
 
 	DefaultYoutubeClientTest(@Autowired YoutubeClient youtubeClient) {
 		this.youtubeClient = youtubeClient;
+	}
+
+	@Test
+	void playlistsByChannel() throws Exception {
+		var playlists = this.youtubeClient.getPlaylistsForChannel(this.channelId);
+		StepVerifier.create(playlists)
+				.expectNextMatches(playlist -> StringUtils.hasText(playlist.playlistId())
+						&& playlist.channelId().equals(channelId) && playlist.itemCount() > 0
+						&& playlist.publishedAt() != null && StringUtils.hasText(playlist.title()))
+				.expectNextCount(28).verifyComplete();
 	}
 
 	@Test
@@ -27,7 +41,8 @@ class DefaultYoutubeClientTest {
 
 	@Test
 	void channelByChannelId() throws Exception {
-		var channel = this.youtubeClient.getChannelById("UC7yfnfvEUlXUIfm8rGLwZdA");
+
+		var channel = this.youtubeClient.getChannelById(this.channelId);
 		validateChannel(channel);
 	}
 
