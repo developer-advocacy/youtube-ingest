@@ -28,6 +28,7 @@ class DefaultYoutubeClientTest {
 	void allVideosByPlaylist() throws Exception {
 		var all = this.youtubeClient.getAllVideosByPlaylist(this.playlistId);
 		StepVerifier.create(all//
+				.doOnNext(video -> log.info(video.toString())) //
 				.collectList()//
 				.map(List::size)//
 		).expectNextMatches(count -> count >= 100).verifyComplete();
