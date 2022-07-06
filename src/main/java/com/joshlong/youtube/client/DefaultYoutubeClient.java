@@ -91,8 +91,8 @@ class DefaultYoutubeClient implements YoutubeClient {
 
 	@Override
 	public Flux<Video> getAllVideosByPlaylist(String playlistId) {
-		var expanded = getVideosByPlaylist(playlistId, null)//
-				.expand(playlistVideos -> {
+		return this.getVideosByPlaylist(playlistId, null)//
+				.expand(playlistVideos -> {//
 					var nextPageToken = playlistVideos.nextPageToken();
 					if (!StringUtils.hasText(nextPageToken)) {
 						return Mono.empty();
@@ -100,8 +100,8 @@ class DefaultYoutubeClient implements YoutubeClient {
 					else {
 						return getVideosByPlaylist(playlistId, nextPageToken);
 					}
-				});
-		return expanded.map(PlaylistVideos::videos).flatMap(Flux::fromIterable);
+				})//
+				.flatMapIterable(PlaylistVideos::videos);
 	}
 
 	// todo figure out pagination. for now, this won't matter since

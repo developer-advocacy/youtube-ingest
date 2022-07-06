@@ -68,6 +68,16 @@ public interface YoutubeClient {
 	 */
 	Mono<PlaylistVideos> getVideosByPlaylist(String playlistId, @Nullable String pageToken);
 
+	/**
+	 * This hides the underlying pagination model that the YouTube API imposes, letting
+	 * you consume all the {@link Video}s as a single stream, rather than having to deal
+	 * with {@link PlaylistVideos} and the implied pagination model surfaced in
+	 * {@link this#getVideosByPlaylist(String, String)}.
+	 * @param playlistId this returns all the {@link Video} items in a particular
+	 * {@link Playlist}.
+	 * @return all the videos within a playlist, hiding the underlying pagination from the
+	 * client.
+	 */
 	Flux<Video> getAllVideosByPlaylist(String playlistId);
 
 }

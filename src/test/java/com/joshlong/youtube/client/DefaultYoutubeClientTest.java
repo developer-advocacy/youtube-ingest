@@ -31,7 +31,8 @@ class DefaultYoutubeClientTest {
 				.doOnNext(video -> log.info(video.title() + " / " + video.publishedAt())) //
 				.collectList()//
 				.map(List::size)//
-		).expectNextMatches(count -> count >= 100).verifyComplete();
+		)//
+				.expectNextMatches(count -> count >= 100).verifyComplete();
 	}
 
 	@Test
