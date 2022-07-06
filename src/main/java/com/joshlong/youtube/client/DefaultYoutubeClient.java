@@ -78,8 +78,8 @@ class DefaultYoutubeClient implements YoutubeClient {
 	@SneakyThrows
 	private Playlist buildPlaylistForJsonNode(JsonNode jsonNode) {
 		var itemCount = jsonNode.get("contentDetails").get("itemCount").intValue();
-		var snippet = jsonNode.get("snippet");
 		var playlistId = jsonNode.get("id").textValue();
+		var snippet = jsonNode.get("snippet");
 		var title = snippet.get("title").textValue();
 		var description = snippet.get("description").textValue();
 		var publishedAt = buildDateFrom(snippet.get("publishedAt").textValue());
@@ -87,6 +87,8 @@ class DefaultYoutubeClient implements YoutubeClient {
 		return new Playlist(playlistId, channelId, publishedAt, title, description, itemCount);
 	}
 
+	// todo figure out pagination. for now, this won't matter since
+	// I've only got like 40 playlists... but ONE DAY..!
 	@Override
 	public Flux<Playlist> getPlaylistsForChannel(String channelId) {
 
@@ -97,7 +99,8 @@ class DefaultYoutubeClient implements YoutubeClient {
 				.bodyToFlux(JsonNode.class)//
 				.flatMap(jn -> {
 					var list = new ArrayList<Playlist>();
-					for (var i : jn.get("items"))
+					var items = jn.get("items");
+					for (var i : items)
 						list.add(buildPlaylistForJsonNode(i));
 					return Flux.fromIterable(list);
 				});
