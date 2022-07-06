@@ -145,7 +145,6 @@ class DefaultYoutubeClient implements YoutubeClient {
 								var totalResults = pageInfo.get("totalResults").intValue();
 								var nextPageToken = jsonNode.has("nextPageToken")
 										? jsonNode.get("nextPageToken").textValue() : null;
-								log.info("nextPageToken: " + nextPageToken);
 								return new PlaylistVideos(playlistId, videoCollection, nextPageToken, null,
 										resultsPerPage, totalResults);
 							});
