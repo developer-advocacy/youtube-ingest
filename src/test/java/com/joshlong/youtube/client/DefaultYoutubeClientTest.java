@@ -16,6 +16,8 @@ class DefaultYoutubeClientTest {
 
 	private final String channelId = "UC7yfnfvEUlXUIfm8rGLwZdA";
 
+	private final String playlistId = "PLgGXSWYM2FpPw8rV0tZoMiJYSCiLhPnOc";
+
 	private final YoutubeClient youtubeClient;
 
 	DefaultYoutubeClientTest(@Autowired YoutubeClient youtubeClient) {
@@ -23,12 +25,21 @@ class DefaultYoutubeClientTest {
 	}
 
 	@Test
+	void allVideosByPlaylist() throws Exception {
+		var all = this.youtubeClient.getAllVideosByPlaylist(this.playlistId);
+		StepVerifier.create(all.collectList().map(List::size)).expectNextMatches(count -> count >= 100)
+				.verifyComplete();
+	}
+
+	@Test
 	void videosByPlaylist() throws Exception {
-		var playlistId = "PLgGXSWYM2FpPw8rV0tZoMiJYSCiLhPnOc";
-		var videos = this.youtubeClient.getVideosByPlaylist(playlistId).map(pv -> pv.videos().size());
-		StepVerifier//
-				.create(videos)//
-				.expectNext(50).verifyComplete();
+
+		var videos = this.youtubeClient.getVideosByPlaylist(playlistId, null).map(pv -> pv.videos().size());
+		StepVerifier.create(videos).expectNext(50).verifyComplete();
+
+		var nextVideos = this.youtubeClient.getVideosByPlaylist(playlistId, "EAAaBlBUOkNESQ")
+				.map(m -> m.videos().size());
+		StepVerifier.create(nextVideos).expectNext(50).verifyComplete();
 	}
 
 	@Test
@@ -66,8 +77,8 @@ class DefaultYoutubeClientTest {
 		StepVerifier.create(video)//
 				.expectNextMatches(result -> result.videoId().equalsIgnoreCase("eIho2S0ZahI")
 						&& !result.tags().isEmpty() && result.tags().contains("Julian Treasure")
-						&& result.viewCount() >= 13852996 && result.commentCount() >= 9596
-						&& result.likeCount() >= 354551 && result.favoriteCount() >= 0
+						&& result.viewCount() >= 13852000 && result.commentCount() >= 9000
+						&& result.likeCount() >= 354000 && result.favoriteCount() >= 0
 						&& result.title().contains("How to speak so that people want to listen"))
 				.verifyComplete();
 

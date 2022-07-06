@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -88,6 +89,21 @@ class DefaultYoutubeClient implements YoutubeClient {
 		return new Playlist(playlistId, channelId, publishedAt, title, description, itemCount);
 	}
 
+	@Override
+	public Flux<Video> getAllVideosByPlaylist(String playlistId) {
+		var expanded = getVideosByPlaylist(playlistId, null)//
+				.expand(playlistVideos -> {
+					var nextPageToken = playlistVideos.nextPageToken();
+					if (!StringUtils.hasText(nextPageToken)) {
+						return Mono.empty();
+					}
+					else {
+						return getVideosByPlaylist(playlistId, nextPageToken);
+					}
+				});
+		return expanded.map(PlaylistVideos::videos).flatMap(Flux::fromIterable);
+	}
+
 	// todo figure out pagination. for now, this won't matter since
 	// I've only got like 40 playlists... but ONE DAY..!
 	@Override
@@ -108,22 +124,34 @@ class DefaultYoutubeClient implements YoutubeClient {
 	}
 
 	@Override
-	public Mono<PlaylistVideos> getVideosByPlaylist(String playlistId) {
-		var url = "https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&key={key}&maxResults=500&playlistId={playlistId}";
-		return this.http.get().uri(url, Map.of("key", this.apiKey, "playlistId", playlistId)).retrieve()
+	public Mono<PlaylistVideos> getVideosByPlaylist(String playlistId, String pageToken) {
+
+		var url = "https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&key={key}&maxResults=500&playlistId={playlistId}"
+				+ (StringUtils.hasText(pageToken) ? "&pageToken={pt}" : "");
+		return this.http.get()//
+				.uri(url, Map.of("key", this.apiKey, "pt", pageToken + "", "playlistId", playlistId))//
+				.retrieve()//
 				.bodyToFlux(JsonNode.class)//
 				.flatMap(jsonNode -> {//
-
 					var items = jsonNode.get("items");
 					var list = new ArrayList<String>();
 					for (var item : items)
 						list.add(item.get("contentDetails").get("videoId").textValue());
 					return getVideosByIds(list)//
-							.map(Map::values)
-							.map(vl -> new PlaylistVideos(playlistId, vl, jsonNode.get("nextPageToken").textValue(),
-									null, jsonNode.get("pageInfo").get("totalResults").intValue()));
+							.map(Map::values)//
+							.map(videoCollection -> {
+								var pageInfo = jsonNode.get("pageInfo");
+								var resultsPerPage = pageInfo.get("resultsPerPage").intValue();
+								var totalResults = pageInfo.get("totalResults").intValue();
+								var nextPageToken = jsonNode.has("nextPageToken")
+										? jsonNode.get("nextPageToken").textValue() : null;
+								log.info("nextPageToken: " + nextPageToken);
+								return new PlaylistVideos(playlistId, videoCollection, nextPageToken, null,
+										resultsPerPage, totalResults);
+							});
 
-				}).singleOrEmpty();
+				})//
+				.singleOrEmpty();
 	}
 
 	private Mono<Channel> findChannel(String username, String urlExtension, Map<String, String> params) {
@@ -166,5 +194,5 @@ class DefaultYoutubeClient implements YoutubeClient {
 }
 
 record PlaylistVideos(String playlistId, Collection<Video> videos, String nextPageToken, String previousPageToken,
-		int totalResults) {
+		int resultsPerPage, int totalResults) {
 }

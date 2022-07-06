@@ -1,5 +1,6 @@
 package com.joshlong.youtube.client;
 
+import org.springframework.lang.Nullable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -60,8 +61,13 @@ public interface YoutubeClient {
 	/**
 	 * Returns all the videos for a given {@link Playlist}.
 	 * @param playlistId the id of the {@link Playlist } in which to find {@link Video}s
+	 * @param pageToken the token representing the next page in the series of
+	 * {@link Video}s. This value can be null and is not required. If not specified, the
+	 * method will return the first page of results.
 	 * @return returns all the {@link Video}s for a given {@link Playlist}s.
 	 */
-	Mono<PlaylistVideos> getVideosByPlaylist(String playlistId);
+	Mono<PlaylistVideos> getVideosByPlaylist(String playlistId, @Nullable String pageToken);
+
+	Flux<Video> getAllVideosByPlaylist(String playlistId);
 
 }
