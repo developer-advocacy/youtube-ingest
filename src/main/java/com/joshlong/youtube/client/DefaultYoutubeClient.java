@@ -192,7 +192,3 @@ class DefaultYoutubeClient implements YoutubeClient {
 	}
 
 }
-
-record PlaylistVideos(String playlistId, Collection<Video> videos, String nextPageToken, String previousPageToken,
-		int resultsPerPage, int totalResults) {
-}
