@@ -57,6 +57,8 @@ public interface YoutubeClient {
 	 */
 	Mono<Video> getVideoById(String videoId);
 
-	Mono<Playlist> getPlaylistById(String playlistId);
+	Flux<Video> getVideosByPlaylist(String playlistId);
+
+	// Mono<Playlist> getPlaylistById(String playlistId);
 
 }

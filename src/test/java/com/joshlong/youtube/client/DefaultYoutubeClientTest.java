@@ -9,7 +9,6 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.util.List;
-import java.util.function.Predicate;
 
 @Slf4j
 @SpringBootTest
@@ -24,13 +23,21 @@ class DefaultYoutubeClientTest {
 	}
 
 	@Test
+	void videosByPlaylist() throws Exception {
+		var playlistId = "PLgGXSWYM2FpNRPDQnAGfAHxMl3zUG2Run";
+		var videos = this.youtubeClient.getVideosByPlaylist(playlistId);
+		StepVerifier.create(videos).expectNextCount(8).verifyComplete();
+	}
+
+	@Test
 	void playlistsByChannel() throws Exception {
 		var playlists = this.youtubeClient.getPlaylistsForChannel(this.channelId);
-		StepVerifier.create(playlists)
+		StepVerifier.create(playlists.doOnNext(p -> log.info(p.playlistId() + ':' + p.title())))
 				.expectNextMatches(playlist -> StringUtils.hasText(playlist.playlistId())
 						&& playlist.channelId().equals(channelId) && playlist.itemCount() > 0
 						&& playlist.publishedAt() != null && StringUtils.hasText(playlist.title()))
-				.expectNextCount(28).verifyComplete();
+				.expectNextCount(28)//
+				.verifyComplete();
 	}
 
 	@Test
