@@ -32,7 +32,6 @@ class DefaultYoutubeClient implements YoutubeClient {
 
 	@SneakyThrows
 	private Video buildVideoFromJsonNode(JsonNode item) {
-
 		var id = item.get("id").textValue();
 		var publishedAt = buildDateFrom(item.get("snippet").get("publishedAt").textValue());
 		var description = item.get("snippet").get("description").textValue();
@@ -62,20 +61,18 @@ class DefaultYoutubeClient implements YoutubeClient {
 				.bodyToFlux(JsonNode.class)//
 				.flatMap(jn -> {
 					var is = jn.get("items");
-					log.info("items size : " + is.size() + "");
 					var list = new ArrayList<Video>();
 					for (var i : is)
 						list.add(buildVideoFromJsonNode(i));
 					return Flux.fromIterable(list);
-				})
-				// .map(this::buildVideoFromJsonNode)
-				.doOnNext(v -> System.out.println(v.videoId())).collectMap(Video::videoId);
+				}).doOnNext(v -> System.out.println(v.videoId())).collectMap(Video::videoId);
 	}
 
 	@Override
 	public Mono<Video> getVideoById(String videoId) {
 		var singleResult = this.getVideosByIds(List.of(videoId));
-		return singleResult.doOnNext(map -> Assert.isTrue(map.size() == 1, () -> "there should be exactly one result"))
+		return singleResult//
+				.doOnNext(map -> Assert.isTrue(map.size() == 1, () -> "there should be exactly one result"))//
 				.map(m -> m.get(videoId));
 	}
 
@@ -96,10 +93,8 @@ class DefaultYoutubeClient implements YoutubeClient {
 	@SneakyThrows
 	private Channel buildChannelFromJsonNode(JsonNode jsonNode) {
 		var items = jsonNode.withArray("items");
-
 		for (var i : items) {
-			System.out.println("found the item " + i.textValue());
-			Assert.isTrue(i.get("kind").textValue().equals("youtube#channel"), () -> "the item is a YouTube channel");
+			Assert.isTrue(i.get("kind").textValue().equals("youtube#channel"), "the item is a YouTube channel");
 			var id = i.get("id").textValue();
 			var title = i.get("snippet").get("title").textValue();
 			var description = i.get("snippet").get("description").textValue();
