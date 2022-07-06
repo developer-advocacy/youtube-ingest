@@ -22,12 +22,12 @@ class DefaultYoutubeClient implements YoutubeClient {
 
 	@Override
 	public Mono<Channel> getChannelByUsername(String username) {
-		return findChannel(username, "&forUsername={username}", Map.of("username", username));
+		return findChannel("&forUsername={username}", Map.of("username", username));
 	}
 
 	@Override
 	public Mono<Channel> getChannelById(String channelId) {
-		return findChannel(channelId, "&id={id}", Map.of("id", channelId));
+		return findChannel("&id={id}", Map.of("id", channelId));
 	}
 
 	@SneakyThrows
@@ -104,25 +104,6 @@ class DefaultYoutubeClient implements YoutubeClient {
 				.flatMapIterable(PlaylistVideos::videos);
 	}
 
-	// todo figure out pagination. for now, this won't matter since
-	// I've only got like 40 playlists... but ONE DAY..!
-	@Override
-	public Flux<Playlist> getPlaylistsForChannel(String channelId) {
-
-		var url = "https://youtube.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&channelId={channelId}&maxResults=50&key={key}";
-		return this.http.get()//
-				.uri(url, Map.of("channelId", channelId, "key", this.apiKey))//
-				.retrieve()//
-				.bodyToFlux(JsonNode.class)//
-				.flatMap(jn -> {
-					var list = new ArrayList<Playlist>();
-					var items = jn.get("items");
-					for (var i : items)
-						list.add(buildPlaylistForJsonNode(i));
-					return Flux.fromIterable(list);
-				});
-	}
-
 	@Override
 	public Mono<PlaylistVideos> getVideosByPlaylist(String playlistId, String pageToken) {
 
@@ -143,9 +124,9 @@ class DefaultYoutubeClient implements YoutubeClient {
 								var pageInfo = jsonNode.get("pageInfo");
 								var resultsPerPage = pageInfo.get("resultsPerPage").intValue();
 								var totalResults = pageInfo.get("totalResults").intValue();
-								var nextPageToken = jsonNode.has("nextPageToken")
-										? jsonNode.get("nextPageToken").textValue() : null;
-								return new PlaylistVideos(playlistId, videoCollection, nextPageToken, null,
+								var nextPageToken = this.getPropertyIfAvailable(jsonNode, "nextPageToken");
+								var prevPageToken = this.getPropertyIfAvailable(jsonNode, "prevPageToken");
+								return new PlaylistVideos(playlistId, videoCollection, nextPageToken, prevPageToken,
 										resultsPerPage, totalResults);
 							});
 
@@ -153,10 +134,11 @@ class DefaultYoutubeClient implements YoutubeClient {
 				.singleOrEmpty();
 	}
 
-	private Mono<Channel> findChannel(String username, String urlExtension, Map<String, String> params) {
-		var uri = "https://youtube.googleapis.com/youtube/v3/channels?part=snippet&key={key}" + urlExtension;
+	private Mono<Channel> findChannel(String urlExtension, Map<String, String> params) {
+		var uri = "https://youtube.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&key={key}"
+				+ urlExtension;
 		var uriVariables = new HashMap<String, String>();
-		uriVariables.putAll(Map.of("username", username, "key", this.apiKey));
+		uriVariables.put("key", this.apiKey);
 		uriVariables.putAll(params);
 		return this.http//
 				.get()//
@@ -167,15 +149,57 @@ class DefaultYoutubeClient implements YoutubeClient {
 				.singleOrEmpty();
 	}
 
+	private String getPropertyIfAvailable(JsonNode jsonNode, String propertyName) {
+		return jsonNode.has(propertyName) ? jsonNode.get(propertyName).textValue() : null;
+	}
+
+	@Override
+	public Mono<ChannelPlaylists> getPlaylistsByChannel(String channelId, String pageToken) {
+		var url = "https://youtube.googleapis.com/youtube/v3/playlists?part=id,status,snippet,contentDetails&channelId={channelId}&maxResults=10&key={key}"
+				+ (StringUtils.hasText(pageToken) ? "&pageToken={pt}" : "");
+		return this.http.get()//
+				.uri(url, Map.of("channelId", channelId, "key", this.apiKey, "pt", "" + pageToken))//
+				.retrieve()//
+				.bodyToFlux(JsonNode.class)//
+				.map(jsonNode -> {
+					var tr = jsonNode.get("pageInfo").get("totalResults").intValue();
+					var nextPageToken = this.getPropertyIfAvailable(jsonNode, "nextPageToken");
+					var prevPageToken = this.getPropertyIfAvailable(jsonNode, "prevPageToken");
+					var list = new ArrayList<Playlist>();
+					var items = jsonNode.get("items");
+					for (var i : items)
+						list.add(buildPlaylistForJsonNode(i));
+					return new ChannelPlaylists(channelId, list, tr, prevPageToken, nextPageToken);
+				})//
+				.singleOrEmpty();
+
+	}
+
+	@Override
+	public Flux<Playlist> getAllPlaylistsByChannel(String channelId) {
+		return this.getPlaylistsByChannel(channelId, null)//
+				.expand(channelPlaylists -> {//
+					var nextPageToken = channelPlaylists.nextPageToken();
+					if (!StringUtils.hasText(nextPageToken)) {
+						return Mono.empty();
+					}
+					else {
+						return getPlaylistsByChannel(channelId, nextPageToken);
+					}
+				})//
+				.flatMapIterable(ChannelPlaylists::playlists);
+	}
+
 	@SneakyThrows
 	private Channel buildChannelFromJsonNode(JsonNode jsonNode) {
-		var items = jsonNode.withArray("items");
+		var items = jsonNode.get("items");
 		for (var i : items) {
 			Assert.isTrue(i.get("kind").textValue().equals("youtube#channel"), "the item is a YouTube channel");
 			var id = i.get("id").textValue();
 			var title = i.get("snippet").get("title").textValue();
 			var description = i.get("snippet").get("description").textValue();
 			var publishedAt = i.get("snippet").get("publishedAt").textValue();
+
 			return new Channel(id, title, description, buildDateFrom(publishedAt));
 		}
 		throw new RuntimeException("we should never reach this point! there was no Channel found");

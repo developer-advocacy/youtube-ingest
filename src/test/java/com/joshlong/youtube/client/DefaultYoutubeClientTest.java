@@ -47,26 +47,44 @@ class DefaultYoutubeClientTest {
 	}
 
 	@Test
+	void allPlaylistsByChannel() throws Exception {
+
+		var channelName = "GoogleChromeDevelopers";
+		var playlists = this.youtubeClient.getChannelById(this.channelId)
+				.flatMapMany(channel -> this.youtubeClient.getAllPlaylistsByChannel(channel.channelId()));
+
+		StepVerifier//
+				.create(playlists.collectList().map(List::size))//
+				.expectNextMatches(count -> count > 20)//
+				.verifyComplete();
+	}
+
+	@Test
 	void playlistsByChannel() throws Exception {
-		var playlists = this.youtubeClient.getPlaylistsForChannel(this.channelId);
-		StepVerifier.create(playlists)//
+		var playlists = this.youtubeClient.getPlaylistsByChannel(this.channelId, null);
+		StepVerifier//
+				.create(playlists.flatMapIterable(ChannelPlaylists::playlists))//
 				.expectNextMatches(playlist -> StringUtils.hasText(playlist.playlistId())
 						&& playlist.channelId().equals(channelId) && playlist.itemCount() > 0
 						&& playlist.publishedAt() != null && StringUtils.hasText(playlist.title()))
-				.expectNextCount(28)//
-				.verifyComplete();
+				.thenConsumeWhile(p -> true).verifyComplete();
 	}
 
 	@Test
 	void channelByUsername() throws Exception {
 		var channel = this.youtubeClient.getChannelByUsername("springsourcedev");
-		validateChannel(channel);
+		validateSpringChannel(channel);
+
+		var googleChannel = this.youtubeClient.getChannelByUsername("GoogleDevelopers");
+		StepVerifier.create(googleChannel).expectNextMatches(
+				c -> c.title().toLowerCase().contains("google") && c.description().toLowerCase().contains("google"))
+				.verifyComplete();
 	}
 
 	@Test
 	void channelByChannelId() throws Exception {
 		var channel = this.youtubeClient.getChannelById(this.channelId);
-		validateChannel(channel);
+		validateSpringChannel(channel);
 	}
 
 	@Test
@@ -88,15 +106,16 @@ class DefaultYoutubeClientTest {
 
 	}
 
-	private void validateChannel(Mono<Channel> channel) {
+	private void validateSpringChannel(Mono<Channel> channel) {
 		StepVerifier//
 				.create(channel)//
-				.expectNextMatches(channel1 -> {//
-					var dateString = channel1.date().toString();
-					return (channel1.title().contains("Spring"))
-							&& (channel1.description().contains("Spring is the most"))
+				.expectNextMatches(channelToMatch -> {//
+					var dateString = channelToMatch.date().toString();
+					return (channelToMatch.title().contains("Spring"))
+							&& (channelToMatch.description().contains("Spring is the most"))
 							&& (dateString.contains(" 2011"));
-				}).verifyComplete();
+				})//
+				.verifyComplete();
 	}
 
 }
