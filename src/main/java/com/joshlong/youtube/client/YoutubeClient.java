@@ -1,5 +1,7 @@
 package com.joshlong.youtube.client;
 
+import reactor.core.publisher.Mono;
+
 import java.util.List;
 import java.util.Map;
 
@@ -18,7 +20,7 @@ public interface YoutubeClient {
 	 * @return a {@link Channel channel} that contains the metadata for a given Youtube
 	 * channel
 	 */
-	Channel getChannelByUsername(String username);
+	Mono<Channel> getChannelByUsername(String username);
 
 	/**
 	 * Finds a youtube channel by the channel ID associated with the username that created
@@ -28,10 +30,23 @@ public interface YoutubeClient {
 	 * @return a {@link Channel channel} that contains the metadata for a given Youtube
 	 * channel
 	 */
-	Channel getChannelById(String channelId);
+	Mono<Channel> getChannelById(String channelId);
 
-	Map<String, Video> getVideosByIds(List<String> videoIds);
+	/**
+	 * This returns all the videos associated with a collection of {@link String }
+	 * videoIds
+	 * @param videoIds takes a collection of {@link String} videoIds and then returns a
+	 * {@link Map<String,Video>} results
+	 * @return a map of videoIds to {@link Video}
+	 */
+	Mono<Map<String, Video>> getVideosByIds(List<String> videoIds);
 
-	Video getVideoById(String videoId);
+	/**
+	 * This in turn delegates to {@link #getVideosByIds(List)} but for a single
+	 * {@link Video record}.
+	 * @param videoId find a record by a single ID
+	 * @return {@link Video} associated with the {@link String videoId}
+	 */
+	Mono<Video> getVideoById(String videoId);
 
 }
