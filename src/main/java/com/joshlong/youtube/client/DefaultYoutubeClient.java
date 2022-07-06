@@ -149,10 +149,6 @@ class DefaultYoutubeClient implements YoutubeClient {
 				.singleOrEmpty();
 	}
 
-	private String getPropertyIfAvailable(JsonNode jsonNode, String propertyName) {
-		return jsonNode.has(propertyName) ? jsonNode.get(propertyName).textValue() : null;
-	}
-
 	@Override
 	public Mono<ChannelPlaylists> getPlaylistsByChannel(String channelId, String pageToken) {
 		var url = "https://youtube.googleapis.com/youtube/v3/playlists?part=id,status,snippet,contentDetails&channelId={channelId}&maxResults=20&key={key}"
@@ -207,6 +203,10 @@ class DefaultYoutubeClient implements YoutubeClient {
 
 	private static Date buildDateFrom(String isoDate) {
 		return Date.from(Instant.parse(isoDate));
+	}
+
+	private String getPropertyIfAvailable(JsonNode jsonNode, String propertyName) {
+		return jsonNode.has(propertyName) ? jsonNode.get(propertyName).textValue() : null;
 	}
 
 	DefaultYoutubeClient(WebClient http, String apiKey) {
