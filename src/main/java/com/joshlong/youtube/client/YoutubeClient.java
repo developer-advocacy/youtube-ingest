@@ -23,7 +23,7 @@ public interface YoutubeClient {
 	Flux<Playlist> getPlaylistsForChannel(String channelId);
 
 	/**
-	 * Finds a youtube channel by the username that created it.
+	 * Finds a Youtube channel by the username that created it.
 	 * @param username a username, like {@code SpringDeveloper}
 	 * @return a {@link Channel channel} that contains the metadata for a given Youtube
 	 * channel
@@ -41,8 +41,8 @@ public interface YoutubeClient {
 	Mono<Channel> getChannelById(String channelId);
 
 	/**
-	 * This returns all the videos associated with a collection of {@link String }
-	 * videoIds
+	 * This returns all the videos associated with a collection of {@link String}
+	 * videoIds.
 	 * @param videoIds takes a collection of {@link String} videoIds and then returns a
 	 * {@link Map<String,Video>} results
 	 * @return a map of videoIds to {@link Video}
@@ -57,8 +57,11 @@ public interface YoutubeClient {
 	 */
 	Mono<Video> getVideoById(String videoId);
 
+	/**
+	 * Returns all the videos for a given {@link Playlist}.
+	 * @param playlistId the id of the {@link Playlist } in which to find {@link Video}s
+	 * @return returns all the {@link Video}s for a given {@link Playlist}s.
+	 */
 	Flux<Video> getVideosByPlaylist(String playlistId);
-
-	// Mono<Playlist> getPlaylistById(String playlistId);
 
 }

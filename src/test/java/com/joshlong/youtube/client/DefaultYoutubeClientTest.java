@@ -32,7 +32,7 @@ class DefaultYoutubeClientTest {
 	@Test
 	void playlistsByChannel() throws Exception {
 		var playlists = this.youtubeClient.getPlaylistsForChannel(this.channelId);
-		StepVerifier.create(playlists.doOnNext(p -> log.info(p.playlistId() + ':' + p.title())))
+		StepVerifier.create(playlists)//
 				.expectNextMatches(playlist -> StringUtils.hasText(playlist.playlistId())
 						&& playlist.channelId().equals(channelId) && playlist.itemCount() > 0
 						&& playlist.publishedAt() != null && StringUtils.hasText(playlist.title()))
