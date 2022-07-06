@@ -155,7 +155,7 @@ class DefaultYoutubeClient implements YoutubeClient {
 
 	@Override
 	public Mono<ChannelPlaylists> getPlaylistsByChannel(String channelId, String pageToken) {
-		var url = "https://youtube.googleapis.com/youtube/v3/playlists?part=id,status,snippet,contentDetails&channelId={channelId}&maxResults=10&key={key}"
+		var url = "https://youtube.googleapis.com/youtube/v3/playlists?part=id,status,snippet,contentDetails&channelId={channelId}&maxResults=20&key={key}"
 				+ (StringUtils.hasText(pageToken) ? "&pageToken={pt}" : "");
 		return this.http.get()//
 				.uri(url, Map.of("channelId", channelId, "key", this.apiKey, "pt", "" + pageToken))//

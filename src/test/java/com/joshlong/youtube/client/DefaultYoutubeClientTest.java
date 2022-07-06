@@ -8,7 +8,9 @@ import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @SpringBootTest
@@ -49,12 +51,11 @@ class DefaultYoutubeClientTest {
 	@Test
 	void allPlaylistsByChannel() throws Exception {
 
-		var channelName = "GoogleChromeDevelopers";
-		var playlists = this.youtubeClient.getChannelById(this.channelId)
+		var channelName = "GoogleDevelopers";
+		var playlists = this.youtubeClient.getChannelByUsername(channelName)
 				.flatMapMany(channel -> this.youtubeClient.getAllPlaylistsByChannel(channel.channelId()));
-
 		StepVerifier//
-				.create(playlists.collectList().map(List::size))//
+				.create(playlists.collectList().map(HashSet::new).map(Set::size))//
 				.expectNextMatches(count -> count > 20)//
 				.verifyComplete();
 	}
