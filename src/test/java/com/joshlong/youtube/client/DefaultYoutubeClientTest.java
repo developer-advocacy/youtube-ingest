@@ -40,7 +40,7 @@ class DefaultYoutubeClientTest {
 	@Test
 	void videoById() throws Exception {
 		var video = this.youtubeClient.getVideoById("eIho2S0ZahI");
-		StepVerifier.create(video)
+		StepVerifier.create(video)//
 				.expectNextMatches(result -> result.videoId().equalsIgnoreCase("eIho2S0ZahI")
 						&& !result.tags().isEmpty() && result.tags().contains("Julian Treasure")
 						&& result.viewCount() >= 13852996 && result.commentCount() >= 9596
