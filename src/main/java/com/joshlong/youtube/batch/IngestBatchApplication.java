@@ -61,7 +61,7 @@ class IngestBatchApplication {
 					.get("reset")//
 					.tasklet((stepContribution, chunkContext) -> {
 						transactionTemplate.execute(status -> {
-							for (var tn : "yt_channels,yt_playlists,yt_videos".split(","))
+							for (var tn : "yt_playlist_videos,yt_channels,yt_playlists,yt_videos".split(","))
 								template.update("update " + tn + " set fresh = false");
 							return null;
 						});
@@ -255,46 +255,55 @@ class IngestBatchApplication {
 		}
 
 		private void doWrite(JdbcTemplate template, PlaylistVideos playlistVideos) {
-			var sql = """
-					insert into yt_videos (
-					    playlist_id,
-					    video_id ,
-					    title,
-					    description,
-					    published_at ,
-					    standard_thumbnail,
-					    category_id,
-					    view_count,
-					    favorite_count,
-					    comment_count  ,
-					    like_count ,
-					    fresh
-					)
-					values ( ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ? , true )
-					on conflict on CONSTRAINT yt_videos_pkey
-					do update set
-					    fresh = true,
-					    playlist_id = excluded.playlist_id,
-					    video_id  = excluded.video_id,
-					    title = excluded.title,
-					    description = excluded.description,
-					    published_at  = excluded.published_at,
-					    standard_thumbnail = excluded.standard_thumbnail,
-					    category_id = excluded.category_id,
-					    view_count = excluded.view_count,
-					    favorite_count = excluded.favorite_count,
-					    comment_count   = excluded.comment_count,
-					    like_count =  excluded.like_count
-					 where
-					    yt_videos.video_id = ?
-					""";
+			var videoSql = """
+					              insert into yt_videos (
+					                  video_id ,
+					                  title,
+					                  description,
+					                  published_at ,
+					                  standard_thumbnail,
+					                  category_id,
+					                  view_count,
+					                  favorite_count,
+					                  comment_count  ,
+					                  like_count ,
+					                  fresh
+					              )
+					              values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , true )
+					              on conflict on CONSTRAINT yt_videos_pkey
+					              do update set
+					                  fresh = true,
+					video_id  = excluded.video_id,
+					                  title = excluded.title,
+					                  description = excluded.description,
+					                  published_at  = excluded.published_at,
+					                  standard_thumbnail = excluded.standard_thumbnail,
+					                  category_id = excluded.category_id,
+					                  view_count = excluded.view_count,
+					                  favorite_count = excluded.favorite_count,
+					                  comment_count   = excluded.comment_count,
+					                  like_count =  excluded.like_count
+					               where
+					                  yt_videos.video_id = ?
+					              """;
 
+			var playlistVideoSql = """
+					insert into yt_playlist_videos(
+						playlist_id, video_id , fresh
+					)
+					values(?,? ,true )
+					on conflict on constraint yt_playlist_videos_pkey
+					do update  set fresh = true
+					""";
 			playlistVideos//
 					.videos()//
-					.forEach(video -> template.update(sql, playlistVideos.playlist().playlistId(), video.videoId(),
-							video.title(), video.description(), video.publishedAt(),
-							video.standardThumbnail().toExternalForm(), video.categoryId(), video.viewCount(),
-							video.favoriteCount(), video.commentCount(), video.likeCount(), video.videoId()));
+					.forEach(video -> {
+						template.update(playlistVideoSql, playlistVideos.playlist().playlistId(), video.videoId());
+						template.update(videoSql, video.videoId(), video.title(), video.description(),
+								video.publishedAt(), video.standardThumbnail().toExternalForm(), video.categoryId(),
+								video.viewCount(), video.favoriteCount(), video.commentCount(), video.likeCount(),
+								video.videoId());
+					});
 
 		}
 
