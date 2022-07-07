@@ -148,9 +148,11 @@ class IngestBatchApplication {
 		@Bean(name = "playlistStepReader")
 		ItemReader<Channel> reader() {
 			return new JdbcCursorItemReaderBuilder<Channel>()//
-					.name("playlistStepReader").sql("select * from yt_channels")//
+					.name("playlistStepReader")//
+					.sql("select * from yt_channels")//
 					.rowMapper((rs, rowNum) -> new Channel(rs.getString("channel_id"), rs.getString("title"),
-							rs.getString("description"), rs.getDate("published_at")))//
+							rs.getString("description"), rs.getDate("published_at"))//
+					)//
 					.dataSource(this.dataSource).build();
 		}
 
