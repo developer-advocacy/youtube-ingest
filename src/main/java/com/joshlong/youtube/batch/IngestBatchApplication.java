@@ -43,8 +43,6 @@ class IngestBatchApplication {
 		return new JdbcTemplate(dataSource);
 	}
 
-	// todo read in all the videos for each of the playlists
-
 	// Reset fresh flag. Everything will be marked fresh = false and only the stuff
 	// newly read from Youtube API will be marked fresh = true.
 	@Configuration
@@ -208,6 +206,7 @@ class IngestBatchApplication {
 
 	}
 
+	// read in all the videos for each of the playlists
 	@Configuration
 	@RequiredArgsConstructor
 	static class VideoStepConfiguration {
