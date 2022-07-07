@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Set;
 
 @Slf4j
-@SpringBootTest
+@SpringBootTest(properties = "spring.batch.job.enabled=false")
 class DefaultYoutubeClientTest {
 
 	private final String channelId = "UC7yfnfvEUlXUIfm8rGLwZdA";
@@ -24,6 +24,26 @@ class DefaultYoutubeClientTest {
 
 	DefaultYoutubeClientTest(@Autowired YoutubeClient youtubeClient) {
 		this.youtubeClient = youtubeClient;
+	}
+
+	@Test
+	void allVideosByChannel() throws Exception {
+		var all = this.youtubeClient.getChannelByUsername("starbuxman")
+				.flatMapMany(channel -> this.youtubeClient.getAllVideosByChannel(channel.channelId()));
+		StepVerifier//
+				.create(all.collectList().map(List::size))//
+				.expectNextMatches(count -> count >= 25)//
+				.verifyComplete();
+	}
+
+	@Test
+	void videosByChannel() throws Exception {
+		var all = this.youtubeClient.getChannelByUsername("starbuxman")
+				.flatMapMany(channel -> this.youtubeClient.getVideosByChannel(channel.channelId(), null));
+		StepVerifier//
+				.create(all.map(cv -> cv.videos().size()))//
+				.expectNextMatches(count -> count == 20)//
+				.verifyComplete();
 	}
 
 	@Test

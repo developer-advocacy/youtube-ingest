@@ -80,4 +80,21 @@ public interface YoutubeClient {
 	 */
 	Mono<Video> getVideoById(String videoId);
 
+	/**
+	 * Returns all the videos associated with a channel, with no indication of the
+	 * playlists to which it belongs.
+	 * @param channelId the id of the channel
+	 * @param pageToken the page token for navigation and pagination
+	 * @return an aggregate type {@link ChannelVideos} containing the results and
+	 * pagination information
+	 */
+	Mono<ChannelVideos> getVideosByChannel(String channelId, String pageToken);
+
+	/**
+	 * Returns all the videos, regardless of the underlying pagination
+	 * @param channelId the id of the channel
+	 * @return a stream of all the {@link Video}s
+	 */
+	Flux<Video> getAllVideosByChannel(String channelId);
+
 }

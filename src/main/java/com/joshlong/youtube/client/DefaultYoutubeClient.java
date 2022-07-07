@@ -133,6 +133,45 @@ class DefaultYoutubeClient implements YoutubeClient {
 				.singleOrEmpty();
 	}
 
+	@Override
+	public Flux<Video> getAllVideosByChannel(String channelId) {
+		return this.getVideosByChannel(channelId, null)//
+				.expand(playlistVideos -> {//
+					var nextPageToken = playlistVideos.nextPageToken();
+					if (!StringUtils.hasText(nextPageToken)) {
+						return Mono.empty();
+					}
+					else {
+						return getVideosByChannel(channelId, nextPageToken);
+					}
+				})//
+				.flatMapIterable(ChannelVideos::videos);
+	}
+
+	@Override
+	public Mono<ChannelVideos> getVideosByChannel(String channelId, String pageToken) {
+		var url = "https://www.googleapis.com/youtube/v3/search?channelId={channelId}"
+				+ "&order=date&part=snippet&type=video&maxResults=20&key={key}"
+				+ (StringUtils.hasText(pageToken) ? "&pageToken={pt}" : "");
+		return this.http.get().uri(url, Map.of("key", this.apiKey, "channelId", channelId, "pt", "" + pageToken))
+				.retrieve().bodyToFlux(JsonNode.class).flatMap(jn -> {
+					var nextPageToken = stringOrNull(jn, "nextPageToken");
+					var prevPageToken = stringOrNull(jn, "prevPageToken");
+					var items = jsonNodeOrNull(jn, "items");
+					Assert.isTrue(items != null, () -> "there should be 1 or more videos returned!");
+
+					var results = new ArrayList<String>();
+					for (var video : items) {
+						results.add(video.get("id").get("videoId").textValue());
+					}
+					log.info("there are " + results.size() + " results");
+					var videosByIds = this.getVideosByIds(results);
+					return videosByIds
+							.map(map -> new ChannelVideos(channelId, map.values(), nextPageToken, prevPageToken));
+				})//
+				.singleOrEmpty();
+	}
+
 	private Mono<Channel> findChannel(String urlExtension, Map<String, String> params) {
 		var uri = "https://youtube.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&key={key}"
 				+ urlExtension;
