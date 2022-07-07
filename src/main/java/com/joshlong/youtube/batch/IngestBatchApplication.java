@@ -70,10 +70,10 @@ class IngestBatchApplication {
 		@Bean(name = "channelStepWriter")
 		ItemWriter<Channel> writer() {
 			var sql = """
-					    insert into yt_channels(channel_id  ,description , published_at , title)
-					    values (?,?,?,?)
+					    insert into yt_channels(channel_id  ,description , published_at , title, fresh)
+					    values (?,?,?,?, true )
 					    on conflict on constraint yt_channels_pkey
-					    do nothing
+					    do update SET fresh = true where yt_channels.channel_id = ?
 					""";
 			return new JdbcBatchItemWriterBuilder<Channel>()//
 					.sql(sql)//
@@ -84,6 +84,7 @@ class IngestBatchApplication {
 						ps.setString(2, channel.description());
 						ps.setDate(3, new java.sql.Date(channel.publishedAt().getTime()));
 						ps.setString(4, channel.title());
+						ps.setString(5, channel.channelId());
 					})//
 					.build();
 		}
@@ -143,23 +144,34 @@ class IngestBatchApplication {
 		}
 
 		private void doWrite(JdbcTemplate template, ChannelPlaylists channelPlaylists) {
-
 			var sql = """
 					insert into yt_playlists (
-					 playlist_id , channel_id, published_at, title, description, item_count
+					    playlist_id,
+					    channel_id,
+					    published_at,
+					    title,
+					    description,
+					    item_count,
+					    fresh
 					)
-					values(? , ?, ?, ?, ?, ?);
+					values(? , ?, ?, ?, ?, ? ,? )
+					on conflict on constraint yt_playlists_pkey
+					do update SET fresh = true where yt_playlists.playlist_id = ?
 					""";
 			var playlists = channelPlaylists.playlists();
-			for (var playlist : playlists)
-				template.update(sql, playlist.playlistId(), playlist.channelId(), playlist.publishedAt(),
-						playlist.title(), playlist.description(), playlist.itemCount());
+			playlists.forEach(playlist -> template.update(sql, playlist.playlistId(), playlist.channelId(),
+					playlist.publishedAt(), playlist.title(), playlist.description(), playlist.itemCount(), true,
+					playlist.playlistId()));
 		}
 
 		@Bean(name = "playlistStep")
 		Step step() {
-			return sbf.get("playlists").<Channel, ChannelPlaylists>chunk(100).reader(reader()).processor(processor())
-					.writer(writer()).build();
+			return sbf.get("playlists")//
+					.<Channel, ChannelPlaylists>chunk(100)//
+					.reader(reader())//
+					.processor(processor())//
+					.writer(writer())//
+					.build();
 		}
 
 	}
