@@ -16,6 +16,7 @@ import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
+import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -41,6 +42,34 @@ class IngestBatchApplication {
 	}
 
 	// todo read in all the videos for each of the playlists
+
+	// reset fresh flag. everything will be marked fresh = false and only the stuff
+	// read from Youtube API will be marked fresh = true.
+	@Configuration
+	@RequiredArgsConstructor
+	static class ResetStepConfiguration {
+
+		private final StepBuilderFactory sbf;
+
+		private final JdbcTemplate template;
+
+		private final TransactionTemplate transactionTemplate;
+
+		@Bean(name = "resetStep")
+		Step step() {
+			return this.sbf//
+					.get("reset")//
+					.tasklet((stepContribution, chunkContext) -> {
+						transactionTemplate.execute(status -> {
+							for (var tn : "yt_channels,yt_playlists".split(","))
+								template.update("update " + tn + " set fresh = false");
+							return null;
+						});
+						return RepeatStatus.FINISHED;
+					}).build();
+		}
+
+	}
 
 	// read in a channel
 	@Configuration
@@ -177,10 +206,12 @@ class IngestBatchApplication {
 	}
 
 	@Bean
-	Job job(JobBuilderFactory jbf, ChannelStepConfiguration step1, PlaylistStepConfiguration step2) {
+	Job job(JobBuilderFactory jbf, ResetStepConfiguration resetStepConfiguration,
+			ChannelStepConfiguration channelStepConfiguration, PlaylistStepConfiguration playlistStepConfiguration) {
 		return jbf.get("yt")//
-				.start(step1.step())//
-				.next(step2.step())//
+				.start(resetStepConfiguration.step())//
+				.next(channelStepConfiguration.step())//
+				.next(playlistStepConfiguration.step())//
 				.incrementer(new RunIdIncrementer())//
 				.build();
 	}
