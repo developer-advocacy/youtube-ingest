@@ -3,6 +3,7 @@ package com.joshlong.youtube.batch;
 import com.joshlong.youtube.YoutubeProperties;
 import com.joshlong.youtube.client.Channel;
 import com.joshlong.youtube.client.Playlist;
+import com.joshlong.youtube.client.Video;
 import com.joshlong.youtube.client.YoutubeClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.Job;
@@ -24,6 +25,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
+import java.sql.Date;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -43,8 +45,8 @@ class IngestBatchApplication {
 
 	// todo read in all the videos for each of the playlists
 
-	// reset fresh flag. everything will be marked fresh = false and only the stuff
-	// read from Youtube API will be marked fresh = true.
+	// Reset fresh flag. Everything will be marked fresh = false and only the stuff
+	// newly read from Youtube API will be marked fresh = true.
 	@Configuration
 	@RequiredArgsConstructor
 	static class ResetStepConfiguration {
@@ -61,12 +63,13 @@ class IngestBatchApplication {
 					.get("reset")//
 					.tasklet((stepContribution, chunkContext) -> {
 						transactionTemplate.execute(status -> {
-							for (var tn : "yt_channels,yt_playlists".split(","))
+							for (var tn : "yt_channels,yt_playlists,yt_videos".split(","))
 								template.update("update " + tn + " set fresh = false");
 							return null;
 						});
 						return RepeatStatus.FINISHED;
-					}).build();
+					})//
+					.build();
 		}
 
 	}
@@ -168,7 +171,7 @@ class IngestBatchApplication {
 		ItemWriter<ChannelPlaylists> writer() {
 			return items -> transactionTemplate.executeWithoutResult(tx -> {
 				for (var cp : items)
-					this.doWrite(template, cp);
+					doWrite(template, cp);
 			});
 		}
 
@@ -205,13 +208,116 @@ class IngestBatchApplication {
 
 	}
 
+	@Configuration
+	@RequiredArgsConstructor
+	static class VideoStepConfiguration {
+
+		private final StepBuilderFactory sbf;
+
+		private final TransactionTemplate transactionTemplate;
+
+		private final YoutubeClient client;
+
+		private final JdbcTemplate template;
+
+		private final DataSource dataSource;
+
+		@Bean(name = "videoStepReader")
+		ItemReader<Playlist> reader() {
+			return new JdbcCursorItemReaderBuilder<Playlist>()//
+					.name("videoStepReader")//
+					.sql("select * from yt_playlists")//
+					.rowMapper((rs, rowNum) -> new Playlist(rs.getString("playlist_id"), rs.getString("channel_id"),
+							new Date(rs.getDate("published_at").getTime()), rs.getString("title"),
+							rs.getString("description"), rs.getInt("item_count")))//
+					.dataSource(this.dataSource)//
+					.build();
+		}
+
+		private record PlaylistVideos(Playlist playlist, List<Video> videos) {
+		}
+
+		@Bean(name = "videoStepProcessor")
+		ItemProcessor<Playlist, PlaylistVideos> processor() {
+			return playlist -> {
+				var videoList = this.client.getAllVideosByPlaylist(playlist.playlistId()).collectList().block();
+				return new PlaylistVideos(playlist, videoList);
+			};
+		}
+
+		@Bean(name = "videoStepWriter")
+		ItemWriter<PlaylistVideos> writer() {
+			return items -> transactionTemplate.executeWithoutResult(tx -> {
+				for (var pvs : items)
+					doWrite(template, pvs);
+			});
+		}
+
+		private void doWrite(JdbcTemplate template, PlaylistVideos playlistVideos) {
+			var sql = """
+					insert into yt_videos (
+					    playlist_id,
+					    video_id ,
+					    title,
+					    description,
+					    published_at ,
+					    standard_thumbnail,
+					    category_id,
+					    view_count,
+					    favorite_count,
+					    comment_count  ,
+					    like_count ,
+					    fresh
+					)
+					values ( ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ? , true )
+					on conflict on constraint yt_videos_pkey
+					do update set
+					    fresh = true,
+					    playlist_id = excluded.playlist_id,
+					    video_id  = excluded.video_id,
+					    title = excluded.title,
+					    description = excluded.description,
+					    published_at  = excluded.published_at,
+					    standard_thumbnail = excluded.standard_thumbnail,
+					    category_id = excluded.category_id,
+					    view_count = excluded.view_count,
+					    favorite_count = excluded.favorite_count,
+					    comment_count   = excluded.comment_count,
+					    like_count =  excluded.like_count
+					 where
+					    yt_videos.video_id = ?
+					""";
+
+			playlistVideos//
+					.videos()//
+					.forEach(video -> template.update(sql, playlistVideos.playlist().playlistId(), video.videoId(),
+							video.title(), video.description(), video.publishedAt(),
+							video.standardThumbnail().toExternalForm(), video.categoryId(), video.viewCount(),
+							video.favoriteCount(), video.commentCount(), video.likeCount(), video.videoId()));
+
+		}
+
+		@Bean(name = "videoStep")
+		Step step() {
+			return sbf.get("videos")//
+					.<Playlist, PlaylistVideos>chunk(100)//
+					.reader(reader())//
+					.processor(processor())//
+					.writer(writer())//
+					.build();
+		}
+
+	}
+
 	@Bean
 	Job job(JobBuilderFactory jbf, ResetStepConfiguration resetStepConfiguration,
-			ChannelStepConfiguration channelStepConfiguration, PlaylistStepConfiguration playlistStepConfiguration) {
+			ChannelStepConfiguration channelStepConfiguration, PlaylistStepConfiguration playlistStepConfiguration,
+			VideoStepConfiguration videoStepConfiguration) {
 		return jbf.get("yt")//
 				.start(resetStepConfiguration.step())//
 				.next(channelStepConfiguration.step())//
 				.next(playlistStepConfiguration.step())//
+				.next(videoStepConfiguration.step())//
 				.incrementer(new RunIdIncrementer())//
 				.build();
 	}
