@@ -81,12 +81,6 @@ class DefaultYoutubeClientTest {
 	}
 
 	@Test
-	void channelByChannelId() throws Exception {
-		var channel = this.youtubeClient.getChannelById(this.channelId);
-		validateSpringChannel(channel);
-	}
-
-	@Test
 	void videosById() throws Exception {
 		var videosMap = this.youtubeClient.getVideosByIds(List.of("ahBjkmkltcc", "EE-5xItDfsg"));
 		StepVerifier.create(videosMap).expectNextMatches(m -> m.size() == 2).verifyComplete();
@@ -109,7 +103,7 @@ class DefaultYoutubeClientTest {
 		StepVerifier//
 				.create(channel)//
 				.expectNextMatches(channelToMatch -> {//
-					var dateString = channelToMatch.date().toString();
+					var dateString = channelToMatch.publishedAt().toString();
 					return (channelToMatch.title().contains("Spring"))
 							&& (channelToMatch.description().contains("Spring is the most"))
 							&& (dateString.contains(" 2011"));

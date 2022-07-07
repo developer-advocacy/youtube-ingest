@@ -25,11 +25,6 @@ class DefaultYoutubeClient implements YoutubeClient {
 		return findChannel("&forUsername={username}", Map.of("username", username));
 	}
 
-	@Override
-	public Mono<Channel> getChannelById(String channelId) {
-		return findChannel("&id={id}", Map.of("id", channelId));
-	}
-
 	@SneakyThrows
 	private Video buildVideoFromJsonNode(JsonNode item) {
 		var id = item.get("id").textValue();

@@ -64,16 +64,6 @@ public interface YoutubeClient {
 	Mono<Channel> getChannelByUsername(String username);
 
 	/**
-	 * Finds a youtube channel by the channel ID associated with the username that created
-	 * it
-	 * @param channelId a channel ID (each YouTube channel can be find by a username or an
-	 * ID)
-	 * @return a {@link Channel channel} that contains the metadata for a given Youtube
-	 * channel
-	 */
-	Mono<Channel> getChannelById(String channelId);
-
-	/**
 	 * This returns all the videos associated with a collection of {@link String}
 	 * videoIds.
 	 * @param videoIds takes a collection of {@link String} videoIds and then returns a

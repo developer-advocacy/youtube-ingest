@@ -1,0 +1,36 @@
+type Query {
+    channelById(id: ID): Channel
+    channelByUsername(username: String): Channel
+}
+
+type Channel {
+    channelId: ID
+    title: String
+    description: String
+    playlists: [Playlist]
+}
+
+
+type Playlist {
+    playlistId: ID
+    channelId: ID
+    publishedAt: String
+    title: String
+    description: String
+    itemCount: Int
+    videos: [Video]
+}
+
+type Video {
+    videoId: ID
+    title: String
+    description: String
+    publishedAt: String
+    standardThumbnail :String,
+    tags : [String]
+    categoryId :Int
+    viewCount :Int
+    likeCount :Int
+    favoriteCount :Int
+    commentCount :Int
+}
