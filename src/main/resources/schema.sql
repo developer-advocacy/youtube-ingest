@@ -5,3 +5,13 @@ create table if not exists yt_channels
     published_at timestamp    not null,
     title        varchar(255) not null
 );
+
+create table if not exists yt_playlists
+(
+    playlist_id  varchar(255) not null primary key,
+    channel_id   varchar(255) not null,
+    published_at timestamp    not null,
+    title        varchar(255) not null,
+    description  text         not null,
+    item_count   int          not null default 0
+);
