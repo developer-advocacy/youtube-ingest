@@ -1,4 +1,4 @@
-package com.joshlong.youtube.explorer;
+package com.joshlong.youtube.graphql;
 
 import com.joshlong.youtube.client.Channel;
 import com.joshlong.youtube.client.Playlist;
@@ -30,11 +30,6 @@ class YoutubeGraphqlController {
 	@SchemaMapping(typeName = "Channel")
 	Flux<Playlist> playlists(Channel channel) {
 		return this.yt.getAllPlaylistsByChannel(channel.channelId());
-	}
-
-	@SchemaMapping(typeName = "Playlist")
-	Mono<Playlist> playlistById(Playlist playlist, @Argument String id) {
-		return null;
 	}
 
 	@SchemaMapping(typeName = "Playlist")
