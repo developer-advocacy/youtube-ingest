@@ -38,6 +38,7 @@ class DefaultYoutubeClientTest {
 
 	@Test
 	void videosByChannel() throws Exception {
+		// this result is paged, and the max is 20
 		var all = this.youtubeClient.getChannelByUsername("starbuxman")
 				.flatMapMany(channel -> this.youtubeClient.getVideosByChannel(channel.channelId(), null));
 		StepVerifier//

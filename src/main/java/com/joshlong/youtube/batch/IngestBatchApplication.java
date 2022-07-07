@@ -17,6 +17,7 @@ import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
+import org.springframework.batch.item.support.ListItemReader;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,6 +28,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import javax.sql.DataSource;
 import java.sql.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Configuration
@@ -211,7 +213,7 @@ class IngestBatchApplication {
 	// read in all the videos for each of the playlists
 	@Configuration
 	@RequiredArgsConstructor
-	static class VideoStepConfiguration {
+	static class PlaylistVideosStepConfiguration {
 
 		private final StepBuilderFactory sbf;
 
@@ -223,7 +225,7 @@ class IngestBatchApplication {
 
 		private final DataSource dataSource;
 
-		@Bean(name = "videoStepReader")
+		@Bean(name = "playlistVideosStepReader")
 		ItemReader<Playlist> reader() {
 			return new JdbcCursorItemReaderBuilder<Playlist>()//
 					.name("videoStepReader")//
@@ -235,10 +237,7 @@ class IngestBatchApplication {
 					.build();
 		}
 
-		private record PlaylistVideos(Playlist playlist, List<Video> videos) {
-		}
-
-		@Bean(name = "videoStepProcessor")
+		@Bean(name = "playlistVideosStepProcessor")
 		ItemProcessor<Playlist, PlaylistVideos> processor() {
 			return playlist -> {
 				var videoList = this.client.getAllVideosByPlaylist(playlist.playlistId()).collectList().block();
@@ -246,15 +245,117 @@ class IngestBatchApplication {
 			};
 		}
 
-		@Bean(name = "videoStepWriter")
+		@Bean(name = "playlistVideosStepWriter")
 		ItemWriter<PlaylistVideos> writer() {
-			return items -> transactionTemplate.executeWithoutResult(tx -> {
-				for (var pvs : items)
-					doWrite(template, pvs);
-			});
+			return new PlaylistVideosItemWriter(this.transactionTemplate, this.template);
 		}
 
-		private void doWrite(JdbcTemplate template, PlaylistVideos playlistVideos) {
+		@Bean(name = "playlistVideosStep")
+		Step step() {
+			return sbf.get("playlistVideos")//
+					.<Playlist, PlaylistVideos>chunk(100)//
+					.reader(reader())//
+					.processor(processor())//
+					.writer(writer())//
+					.build();
+		}
+
+	}
+
+	@Configuration
+	@RequiredArgsConstructor
+	static class ChannelVideosStepConfiguration {
+
+		private final YoutubeClient client;
+
+		private final YoutubeProperties properties;
+
+		private final JdbcTemplate jdbcTemplate;
+
+		private final TransactionTemplate transactionTemplate;
+
+		private final StepBuilderFactory sbf;
+
+		@Bean(name = "channelVideosReader")
+		ItemReader<Video> reader() {
+			var videoList = client.getChannelByUsername(properties.batch().channelUsername())
+					.flatMapMany(channel -> client.getAllVideosByChannel(channel.channelId())).collectList().block();
+			return new ListItemReader<>(Objects.requireNonNull(videoList));
+		}
+
+		@Bean(name = "channelVideosWriter")
+		ItemWriter<Video> writer() {
+			return new VideoItemWriter(this.transactionTemplate, this.jdbcTemplate);
+		}
+
+		@Bean(name = "channelVideosStep")
+		Step step() {
+			return this.sbf.get("channelVideos").<Video, Video>chunk(100).reader(reader()).writer(writer()).build();
+		}
+
+	}
+
+	@Bean
+	Job job(JobBuilderFactory jbf, ResetStepConfiguration resetStepConfiguration,
+			ChannelStepConfiguration channelStepConfiguration, PlaylistStepConfiguration playlistStepConfiguration,
+			PlaylistVideosStepConfiguration videoStepConfiguration,
+			ChannelVideosStepConfiguration channelVideosStepConfiguration) {
+		return jbf.get("yt")//
+				.start(resetStepConfiguration.step())//
+				.next(channelStepConfiguration.step())//
+				.next(playlistStepConfiguration.step())//
+				.next(videoStepConfiguration.step())//
+				.next(channelVideosStepConfiguration.step())//
+				.incrementer(new RunIdIncrementer())//
+				.build();
+	}
+
+	static record PlaylistVideos(Playlist playlist, List<Video> videos) {
+	}
+
+	static class PlaylistVideosItemWriter implements ItemWriter<PlaylistVideos> {
+
+		private final TransactionTemplate transactionTemplate;
+
+		private final JdbcTemplate jdbcTemplate;
+
+		private final VideoItemWriter videoItemWriter;
+
+		PlaylistVideosItemWriter(TransactionTemplate transactionTemplate, JdbcTemplate jdbcTemplate) {
+			this.transactionTemplate = transactionTemplate;
+			this.jdbcTemplate = jdbcTemplate;
+			this.videoItemWriter = new VideoItemWriter(this.transactionTemplate, this.jdbcTemplate);
+		}
+
+		@Override
+		public void write(List<? extends PlaylistVideos> playlistVideosList) throws Exception {
+			var playlistVideoSql = """
+					insert into yt_playlist_videos(
+						playlist_id, video_id , fresh
+					)
+					values(?,? ,true )
+					on conflict on constraint yt_playlist_videos_pkey
+					do update  set fresh = true
+					""";
+
+			for (var playlistVideos : playlistVideosList) {
+				var videoList = playlistVideos.videos();
+				videoList.forEach(video -> this.jdbcTemplate.update(playlistVideoSql,
+						playlistVideos.playlist().playlistId(), video.videoId()));
+				this.videoItemWriter.write(videoList);
+			}
+		}
+
+	}
+
+	@RequiredArgsConstructor
+	static class VideoItemWriter implements ItemWriter<Video> {
+
+		private final TransactionTemplate transactionTemplate;
+
+		private final JdbcTemplate jdbcTemplate;
+
+		private void doWrite(JdbcTemplate template, List<? extends Video> videos) {
 			var videoSql = """
 					              insert into yt_videos (
 					                  video_id ,
@@ -287,49 +388,22 @@ class IngestBatchApplication {
 					                  yt_videos.video_id = ?
 					              """;
 
-			var playlistVideoSql = """
-					insert into yt_playlist_videos(
-						playlist_id, video_id , fresh
-					)
-					values(?,? ,true )
-					on conflict on constraint yt_playlist_videos_pkey
-					do update  set fresh = true
-					""";
-			playlistVideos//
-					.videos()//
-					.forEach(video -> {
-						template.update(playlistVideoSql, playlistVideos.playlist().playlistId(), video.videoId());
-						template.update(videoSql, video.videoId(), video.title(), video.description(),
-								video.publishedAt(), video.standardThumbnail().toExternalForm(), video.categoryId(),
-								video.viewCount(), video.favoriteCount(), video.commentCount(), video.likeCount(),
-								video.videoId());
-					});
+			videos.forEach(video -> {
+
+				template.update(videoSql, video.videoId(), video.title(), video.description(), video.publishedAt(),
+						video.standardThumbnail().toExternalForm(), video.categoryId(), video.viewCount(),
+						video.favoriteCount(), video.commentCount(), video.likeCount(), video.videoId());
+			});
 
 		}
 
-		@Bean(name = "videoStep")
-		Step step() {
-			return sbf.get("videos")//
-					.<Playlist, PlaylistVideos>chunk(100)//
-					.reader(reader())//
-					.processor(processor())//
-					.writer(writer())//
-					.build();
+		@Override
+		public void write(List<? extends Video> items) throws Exception {
+			this.transactionTemplate.executeWithoutResult(tx -> {
+				this.doWrite(this.jdbcTemplate, items);
+			});
 		}
 
-	}
-
-	@Bean
-	Job job(JobBuilderFactory jbf, ResetStepConfiguration resetStepConfiguration,
-			ChannelStepConfiguration channelStepConfiguration, PlaylistStepConfiguration playlistStepConfiguration,
-			VideoStepConfiguration videoStepConfiguration) {
-		return jbf.get("yt")//
-				.start(resetStepConfiguration.step())//
-				.next(channelStepConfiguration.step())//
-				.next(playlistStepConfiguration.step())//
-				.next(videoStepConfiguration.step())//
-				.incrementer(new RunIdIncrementer())//
-				.build();
 	}
 
 }
