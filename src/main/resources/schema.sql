@@ -20,8 +20,8 @@ create table if not exists yt_playlists
 
 create table if not exists yt_videos
 (
-    playlist_id varchar(255) references yt_playlists(playlist_id),
-    video_id           varchar(255) not null primary key,
+    playlist_id        varchar(255) references yt_playlists (playlist_id),
+    video_id           varchar(255) not null,
     title              varchar(255) not null,
     description        text         not null,
     published_at       timestamp    not null,
@@ -31,5 +31,6 @@ create table if not exists yt_videos
     favorite_count     int          not null default 0,
     comment_count      int          not null default 0,
     like_count         int          not null default 0,
-    fresh              boolean               default false
+    fresh              boolean               default false,
+    primary key (playlist_id, video_id)
 );

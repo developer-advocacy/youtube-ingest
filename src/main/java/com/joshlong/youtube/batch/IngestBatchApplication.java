@@ -270,7 +270,7 @@ class IngestBatchApplication {
 					    fresh
 					)
 					values ( ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ? , true )
-					on conflict on constraint yt_videos_pkey
+					on conflict on CONSTRAINT yt_videos_pkey
 					do update set
 					    fresh = true,
 					    playlist_id = excluded.playlist_id,
