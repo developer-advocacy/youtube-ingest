@@ -13,6 +13,8 @@ import java.net.URL;
 import java.time.Instant;
 import java.util.*;
 
+import static com.joshlong.youtube.client.DefaultYoutubeClient.JsonFormattingUtils.*;
+
 @Slf4j
 class DefaultYoutubeClient implements YoutubeClient {
 
@@ -28,20 +30,22 @@ class DefaultYoutubeClient implements YoutubeClient {
 	@SneakyThrows
 	private Video buildVideoFromJsonNode(JsonNode item) {
 		var id = item.get("id").textValue();
-		var publishedAt = buildDateFrom(item.get("snippet").get("publishedAt").textValue());
-		var description = item.get("snippet").get("description").textValue();
-		var title = item.get("snippet").get("title").textValue();
-		var thumbnailUrl = new URL(item.get("snippet").get("thumbnails").get("default").get("url").textValue());
-		var tags = item.get("snippet").get("tags");
+		var snippet = item.get("snippet");
+		var publishedAt = buildDateFrom(snippet.get("publishedAt").textValue());
+		var description = snippet.get("description").textValue();
+		var title = snippet.get("title").textValue();
+		var thumbnailUrl = new URL(snippet.get("thumbnails").get("default").get("url").textValue());
+		var tags = jsonNodeOrNull(snippet, "tags");
 		var statistics = item.get("statistics");
-		var viewCount = Integer.parseInt(statistics.get("viewCount").textValue());
-		var likeCount = Integer.parseInt(statistics.get("likeCount").textValue());
-		var favCount = Integer.parseInt(statistics.get("favoriteCount").textValue());
-		var commentCount = Integer.parseInt(statistics.get("commentCount").textValue());
-		var categoryId = Integer.parseInt(item.get("snippet").get("categoryId").textValue());
+		var viewCount = numberOrZero(statistics, "viewCount");
+		var likeCount = numberOrZero(statistics, "likeCount");
+		var favCount = numberOrZero(statistics, "favoriteCount");
+		var commentCount = numberOrZero(statistics, "commentCount");
+		var categoryId = Integer.parseInt(snippet.get("categoryId").textValue());
 		var tagsList = new ArrayList<String>();
-		for (var tag : tags)
-			tagsList.add(tag.textValue());
+		if (null != tags)
+			for (var tag : tags)
+				tagsList.add(tag.textValue());
 		return new Video(id, title, description, publishedAt, thumbnailUrl, tagsList, categoryId, viewCount, likeCount,
 				favCount, commentCount);
 	}
@@ -119,8 +123,8 @@ class DefaultYoutubeClient implements YoutubeClient {
 								var pageInfo = jsonNode.get("pageInfo");
 								var resultsPerPage = pageInfo.get("resultsPerPage").intValue();
 								var totalResults = pageInfo.get("totalResults").intValue();
-								var nextPageToken = this.getPropertyIfAvailable(jsonNode, "nextPageToken");
-								var prevPageToken = this.getPropertyIfAvailable(jsonNode, "prevPageToken");
+								var nextPageToken = stringOrNull(jsonNode, "nextPageToken");
+								var prevPageToken = stringOrNull(jsonNode, "prevPageToken");
 								return new PlaylistVideos(playlistId, videoCollection, nextPageToken, prevPageToken,
 										resultsPerPage, totalResults);
 							});
@@ -154,8 +158,8 @@ class DefaultYoutubeClient implements YoutubeClient {
 				.bodyToFlux(JsonNode.class)//
 				.map(jsonNode -> {
 					var tr = jsonNode.get("pageInfo").get("totalResults").intValue();
-					var nextPageToken = this.getPropertyIfAvailable(jsonNode, "nextPageToken");
-					var prevPageToken = this.getPropertyIfAvailable(jsonNode, "prevPageToken");
+					var nextPageToken = stringOrNull(jsonNode, "nextPageToken");
+					var prevPageToken = stringOrNull(jsonNode, "prevPageToken");
 					var list = new ArrayList<Playlist>();
 					var items = jsonNode.get("items");
 					for (var i : items)
@@ -196,12 +200,27 @@ class DefaultYoutubeClient implements YoutubeClient {
 		throw new RuntimeException("we should never reach this point! there was no Channel found");
 	}
 
-	private static Date buildDateFrom(String isoDate) {
-		return Date.from(Instant.parse(isoDate));
-	}
+	static class JsonFormattingUtils {
 
-	private String getPropertyIfAvailable(JsonNode jsonNode, String propertyName) {
-		return jsonNode.has(propertyName) ? jsonNode.get(propertyName).textValue() : null;
+		static int numberOrZero(JsonNode node, String propertyName) {
+			var json = jsonNodeOrNull(node, propertyName);
+			return json != null ? Integer.parseInt(json.textValue()) : 0;
+
+		}
+
+		static Date buildDateFrom(String isoDate) {
+			return Date.from(Instant.parse(isoDate));
+		}
+
+		static JsonNode jsonNodeOrNull(JsonNode node, String propertyName) {
+			return node.has(propertyName) ? node.get(propertyName) : null;
+		}
+
+		static String stringOrNull(JsonNode jsonNode, String propertyName) {
+			var res = jsonNodeOrNull(jsonNode, propertyName);
+			return res != null ? res.textValue() : null;
+		}
+
 	}
 
 	DefaultYoutubeClient(WebClient http, String apiKey) {
