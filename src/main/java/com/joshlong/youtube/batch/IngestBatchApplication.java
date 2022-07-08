@@ -278,9 +278,20 @@ class IngestBatchApplication {
 
 		@Bean(name = "channelVideosReader")
 		ItemReader<Video> reader() {
-			var videoList = client.getChannelByUsername(properties.batch().channelUsername())
-					.flatMapMany(channel -> client.getAllVideosByChannel(channel.channelId())).collectList().block();
-			return new ListItemReader<>(Objects.requireNonNull(videoList));
+			var itemReaderAtomicReference = new AtomicReference<ItemReader<Video>>();
+			return () -> {
+				if (itemReaderAtomicReference.get() == null) {
+
+					var data = client//
+							.getChannelByUsername(properties.batch().channelUsername())//
+							.flatMapMany(channel -> client.getAllVideosByChannel(channel.channelId()))//
+							.collectList()//
+							.block();
+					var listItemReader = new ListItemReader<>(Objects.requireNonNull(data));
+					itemReaderAtomicReference.set(listItemReader);
+				}
+				return itemReaderAtomicReference.get().read();
+			};
 		}
 
 		@Bean(name = "channelVideosWriter")

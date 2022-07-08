@@ -38,6 +38,7 @@ create table if not exists yt_videos
     favorite_count     int          not null default 0,
     comment_count      int          not null default 0,
     like_count         int          not null default 0,
-    fresh              boolean               default false
+    fresh              boolean               default false,
+    channel_id         varchar(255) not null references yt_channels (channel_id)
 
 );
