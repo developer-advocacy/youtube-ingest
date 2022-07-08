@@ -31,6 +31,7 @@ class DefaultYoutubeClient implements YoutubeClient {
 	private Video buildVideoFromJsonNode(JsonNode item) {
 		var id = item.get("id").textValue();
 		var snippet = item.get("snippet");
+		var channelId = snippet.get("channelId").textValue();
 		var publishedAt = buildDateFrom(snippet.get("publishedAt").textValue());
 		var description = snippet.get("description").textValue();
 		var title = snippet.get("title").textValue();
@@ -47,7 +48,7 @@ class DefaultYoutubeClient implements YoutubeClient {
 			for (var tag : tags)
 				tagsList.add(tag.textValue());
 		return new Video(id, title, description, publishedAt, thumbnailUrl, tagsList, categoryId, viewCount, likeCount,
-				favCount, commentCount);
+				favCount, commentCount, channelId);
 	}
 
 	@Override
@@ -115,8 +116,12 @@ class DefaultYoutubeClient implements YoutubeClient {
 				.flatMap(jsonNode -> {//
 					var items = jsonNode.get("items");
 					var list = new ArrayList<String>();
-					for (var item : items)
+					for (var item : items) {
+						// var channelId =
+						// item.get("snippet").get("channelId").textValue() ;
+
 						list.add(item.get("contentDetails").get("videoId").textValue());
+					}
 					return getVideosByIds(list)//
 							.map(Map::values)//
 							.map(videoCollection -> {

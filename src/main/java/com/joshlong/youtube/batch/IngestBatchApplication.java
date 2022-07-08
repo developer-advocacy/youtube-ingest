@@ -8,10 +8,13 @@ import com.joshlong.youtube.client.YoutubeClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.core.scope.context.ChunkContext;
+import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
@@ -306,18 +309,51 @@ class IngestBatchApplication {
 
 	}
 
+	@Configuration
+	@RequiredArgsConstructor
+	static class CleanupPlaylistsStepConfiguration {
+
+		private final StepBuilderFactory sbf;
+
+		private final JdbcTemplate template;
+
+		@Bean
+		Step step() {
+			return this.sbf.get("cleanup").tasklet((stepContribution, chunkContext) -> {
+				// delete all the playlists that dont have a relationship with a video
+				var sql = """
+						delete from yt_playlists pl where pl.playlist_id not in (
+						    select pv.playlist_id from yt_playlist_videos pv where pv.video_id in (select v.video_id from yt_videos v)
+						)
+						""";
+				template.update(sql);
+				return RepeatStatus.FINISHED;
+			}) //
+					.build();
+		}
+
+	}
+
 	@Bean
 	Job job(JobBuilderFactory jbf, ResetStepConfiguration resetStepConfiguration,
 			ChannelStepConfiguration channelStepConfiguration, PlaylistStepConfiguration playlistStepConfiguration,
-			PlaylistVideosStepConfiguration videoStepConfiguration,
-			ChannelVideosStepConfiguration channelVideosStepConfiguration) {
+			PlaylistVideosStepConfiguration playlistVideosStepConfiguration,
+			ChannelVideosStepConfiguration channelVideosStepConfiguration,
+			CleanupPlaylistsStepConfiguration cleanupPlaylistsStepConfiguration) {
+
+		/**
+		 * step 1 write ALL the videos per channel step 2 somehow write all the videos for
+		 * all the playlists, but then have a flag or something to delete the videos that
+		 * werent added in the original round of writes for all the videos per channel.
+		 * basically if a video/playlist ISNT a channel video, then i dont want it
+		 */
 		return jbf.get("yt")//
 				.start(resetStepConfiguration.step())//
 				.next(channelStepConfiguration.step())//
 				.next(playlistStepConfiguration.step())//
-				.next(videoStepConfiguration.step())//
 				.next(channelVideosStepConfiguration.step())//
-				.incrementer(new RunIdIncrementer())//
+				.next(playlistVideosStepConfiguration.step())//
+				.next(cleanupPlaylistsStepConfiguration.step()).incrementer(new RunIdIncrementer())//
 				.build();
 	}
 
@@ -330,12 +366,9 @@ class IngestBatchApplication {
 
 		private final JdbcTemplate jdbcTemplate;
 
-		private final VideoItemWriter videoItemWriter;
-
 		PlaylistVideosItemWriter(TransactionTemplate transactionTemplate, JdbcTemplate jdbcTemplate) {
 			this.transactionTemplate = transactionTemplate;
 			this.jdbcTemplate = jdbcTemplate;
-			this.videoItemWriter = new VideoItemWriter(this.transactionTemplate, this.jdbcTemplate);
 		}
 
 		@Override
@@ -353,7 +386,6 @@ class IngestBatchApplication {
 				var videoList = playlistVideos.videos();
 				videoList.forEach(video -> this.jdbcTemplate.update(playlistVideoSql,
 						playlistVideos.playlist().playlistId(), video.videoId()));
-				this.videoItemWriter.write(videoList);
 			}
 		}
 
@@ -379,9 +411,10 @@ class IngestBatchApplication {
 					                  favorite_count,
 					                  comment_count  ,
 					                  like_count ,
-					                  fresh
+					                  fresh,
+					                  channel_id
 					              )
-					              values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , true )
+					              values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? , true, ?)
 					              on conflict on CONSTRAINT yt_videos_pkey
 					              do update set
 					                  fresh = true,
@@ -399,12 +432,10 @@ class IngestBatchApplication {
 					                  yt_videos.video_id = ?
 					              """;
 
-			videos.forEach(video -> {
-
-				template.update(videoSql, video.videoId(), video.title(), video.description(), video.publishedAt(),
-						video.standardThumbnail().toExternalForm(), video.categoryId(), video.viewCount(),
-						video.favoriteCount(), video.commentCount(), video.likeCount(), video.videoId());
-			});
+			videos.forEach(video -> template.update(videoSql, video.videoId(), video.title(), video.description(),
+					video.publishedAt(), video.standardThumbnail().toExternalForm(), video.categoryId(),
+					video.viewCount(), video.favoriteCount(), video.commentCount(), video.likeCount(),
+					video.channelId(), video.videoId()));
 
 		}
 
