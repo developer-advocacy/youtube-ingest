@@ -117,9 +117,6 @@ class DefaultYoutubeClient implements YoutubeClient {
 					var items = jsonNode.get("items");
 					var list = new ArrayList<String>();
 					for (var item : items) {
-						// var channelId =
-						// item.get("snippet").get("channelId").textValue() ;
-
 						list.add(item.get("contentDetails").get("videoId").textValue());
 					}
 					return getVideosByIds(list)//
