@@ -27,6 +27,39 @@ class DefaultYoutubeClient implements YoutubeClient {
 		return findChannel("&forUsername={username}", Map.of("username", username));
 	}
 
+	/**
+	 *
+	 * todo we need to decompose this a little: to get a channel for a username. a method
+	 * to get uploads playlist for a channel. to get all videos from a playlist.
+	 *
+	 * This returns all the videos for a given channel
+	 * @param username the username whose channel content we want to find
+	 * @return all the videos
+	 */
+	@Override
+	public Flux<Video> getAllVideosByUsernameUploads(String username) {
+		//
+		// https://stackoverflow.com/questions/18953499/youtube-api-to-fetch-all-videos-on-a-channel/27872244#27872244
+		// this solution has a low quota cost and seems to truly return <em>all</em> the
+		// videos
+		//
+		var playlistForChannel = "https://www.googleapis.com/youtube/v3/channels?part=contentDetails&forUsername={user}&key={key}";
+		return http//
+				.get()//
+				.uri(playlistForChannel, Map.of("user", username, "key", this.apiKey))//
+				.retrieve()//
+				.bodyToFlux(JsonNode.class)//
+				.flatMap(jsonNode -> {
+					var uploadsPlaylistId = jsonNode//
+							.get("items")//
+							.get(0).get("contentDetails")//
+							.get("relatedPlaylists")//
+							.get("uploads")//
+							.textValue();
+					return getAllVideosByPlaylist(uploadsPlaylistId);
+				});
+	}
+
 	@SneakyThrows
 	private Video buildVideoFromJsonNode(JsonNode item) {
 		var id = item.get("id").textValue();

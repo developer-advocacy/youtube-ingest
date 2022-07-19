@@ -80,6 +80,16 @@ class DefaultYoutubeClientTest {
 	}
 
 	@Test
+	void videosForUsername() {
+
+		var videos = this.youtubeClient//
+				.getAllVideosByUsernameUploads("SpringSourceDev").take(510).collectList()//
+				.map(List::size);
+
+		StepVerifier.create(videos).expectNext(510).verifyComplete();
+	}
+
+	@Test
 	void playlistsByChannel() throws Exception {
 		var playlists = this.youtubeClient.getPlaylistsByChannel(this.channelId, null);
 		StepVerifier//

@@ -17,6 +17,13 @@ import java.util.Map;
 public interface YoutubeClient {
 
 	/**
+	 * this does a little bit of everything and I think should be decomposed
+	 * @param username
+	 * @return
+	 */
+	Flux<Video> getAllVideosByUsernameUploads(String username);
+
+	/**
 	 * Returns all the videos for a given {@link Playlist}.
 	 * @param playlistId the id of the {@link Playlist } in which to find {@link Video}s
 	 * @param pageToken the token representing the next page in the series of
