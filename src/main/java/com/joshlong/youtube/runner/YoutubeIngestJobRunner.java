@@ -1,43 +1,16 @@
 package com.joshlong.youtube.runner;
 
-import com.joshlong.youtube.YoutubeProperties;
 import com.joshlong.youtube.client.Channel;
+import com.joshlong.youtube.client.Playlist;
 import com.joshlong.youtube.client.Video;
 import com.joshlong.youtube.client.YoutubeClient;
-import io.r2dbc.spi.ConnectionFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.r2dbc.connection.R2dbcTransactionManager;
 import org.springframework.r2dbc.core.DatabaseClient;
-import org.springframework.transaction.ReactiveTransactionManager;
-import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-@Configuration
-class IngestRunnerJob {
-
-	@Bean
-	ReactiveTransactionManager reactiveTransactionManager(ConnectionFactory cf) {
-		return new R2dbcTransactionManager(cf);
-	}
-
-	@Bean
-	TransactionalOperator transactionalOperator(ReactiveTransactionManager rtm) {
-		return TransactionalOperator.create(rtm);
-	}
-
-	@Bean
-	YoutubeIngestJobRunner youtubeIngestJobRunner(YoutubeClient client, DatabaseClient databaseClient,
-			YoutubeProperties properties) {
-		return new YoutubeIngestJobRunner(client, databaseClient, properties.batch().channelUsername());
-	}
-
-}
 
 @Slf4j
 @RequiredArgsConstructor
@@ -49,20 +22,39 @@ class YoutubeIngestJobRunner implements ApplicationRunner {
 
 	private final String channelUsername;
 
-	private static void debugVideo(Video video) {
-		if (log.isDebugEnabled()) {
-			log.info("========================================================");
-			log.info(video.toString());
-		}
-	}
-
 	@Override
 	public void run(ApplicationArguments args) {
 		resetTablesFreshStatus()//
 				.thenMany(writeChannel())//
-				.flatMap(c -> client.getAllVideosByUsernameUploads(channelUsername))//
-				.flatMap(this::doWriteVideo)//
-				.subscribe(YoutubeIngestJobRunner::debugVideo);
+				.flatMap(channel -> client.getAllPlaylistsByChannel(channel.channelId()).flatMap(this::doWritePlaylist))// playlists
+				// .flatMap( playlist ->
+				// client.getAllVideosByPlaylist(playlist.playlistId()) ) // videos for
+				// playlists todo
+				.thenMany(c -> client.getAllVideosByUsernameUploads(channelUsername).flatMap(this::doWriteVideo))// videos
+				.doFinally(st -> log.info("finished...")).subscribe();
+	}
+
+	private Mono<Playlist> doWritePlaylist(Playlist playlist) {
+		var sql = """
+				insert into yt_playlists (
+				    playlist_id,
+				    channel_id,
+				    published_at,
+				    title,
+				    description,
+				    item_count,
+				    fresh
+				)
+				values( :playlistId  ,  :channelId,  :publishedAt, :title, :description, :itemCount , true )
+				on conflict on constraint yt_playlists_pkey
+				do update SET fresh = true where yt_playlists.playlist_id = :playlistId
+				""";
+
+		return this.databaseClient.sql(sql)//
+				.bind("itemCount", playlist.itemCount()).bind("description", playlist.description())
+				.bind("title", playlist.title()).bind("publishedAt", playlist.publishedAt())
+				.bind("channelId", playlist.channelId()).bind("playlistId", playlist.playlistId()).fetch().rowsUpdated()
+				.map(count -> playlist);//
 	}
 
 	private Mono<Video> doWriteVideo(Video video) {
@@ -79,12 +71,13 @@ class YoutubeIngestJobRunner implements ApplicationRunner {
 				    comment_count  ,
 				    like_count ,
 				    fresh,
-				    channel_id
+				    channel_id,
+				    tags
 				)
 				values (
 				    :videoId,  :title,  :description, :publishedAt,
 				    :standardThumbnail,  :categoryId,  :viewCount,
-				    :favoriteCount, :commentCount, :likeCount , true, :channelId
+				    :favoriteCount, :commentCount, :likeCount , true, :channelId, :tags
 				)
 				on conflict on CONSTRAINT yt_videos_pkey
 				do update set
@@ -98,7 +91,8 @@ class YoutubeIngestJobRunner implements ApplicationRunner {
 				    view_count = excluded.view_count,
 				    favorite_count = excluded.favorite_count,
 				    comment_count   = excluded.comment_count,
-				    like_count =  excluded.like_count
+				    like_count =  excluded.like_count ,
+				    tags = excluded.tags
 				 where
 				    yt_videos.video_id =  :videoId
 				""";
@@ -114,6 +108,7 @@ class YoutubeIngestJobRunner implements ApplicationRunner {
 				.bind("viewCount", video.viewCount())//
 				.bind("favoriteCount", video.favoriteCount())//
 				.bind("commentCount", video.commentCount())//
+				.bind("tags", video.tags().toArray(new String[0]))//
 				.bind("likeCount", video.likeCount())//
 				.bind("channelId", video.channelId())//
 				.fetch()//

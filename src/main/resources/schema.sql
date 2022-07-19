@@ -40,6 +40,7 @@ create table if not exists yt_videos
     like_count         int          not null default 0,
     fresh              boolean               default false,
     channel_id         varchar(255) not null references yt_channels (channel_id),
-    created_by_channel boolean               default false
+    created_by_channel boolean               default false,
+    tags               text[]
 
 );
