@@ -1,6 +1,5 @@
 package com.joshlong.youtube.runner;
 
-import com.joshlong.youtube.YoutubeIngestApplication;
 import com.joshlong.youtube.YoutubeProperties;
 import com.joshlong.youtube.client.YoutubeClient;
 import io.r2dbc.spi.ConnectionFactory;
@@ -10,8 +9,6 @@ import org.springframework.r2dbc.connection.R2dbcTransactionManager;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.transaction.ReactiveTransactionManager;
 import org.springframework.transaction.reactive.TransactionalOperator;
-
-import java.util.concurrent.CountDownLatch;
 
 @Configuration
 class IngestRunnerJobConfiguration {

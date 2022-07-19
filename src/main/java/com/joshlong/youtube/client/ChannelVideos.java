@@ -1,7 +1,6 @@
 package com.joshlong.youtube.client;
 
 import java.util.Collection;
-import java.util.List;
 
 /**
  * holder for the results coming back from the pagination methods.
