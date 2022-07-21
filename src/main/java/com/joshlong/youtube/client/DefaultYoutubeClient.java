@@ -27,6 +27,11 @@ class DefaultYoutubeClient implements YoutubeClient {
 		return findChannel("&forUsername={username}", Map.of("username", username));
 	}
 
+	@Override
+	public Mono<Channel> getChannelById(String channelId) {
+		return findChannel("&id={channelId}", Map.of("channelId", channelId));
+	}
+
 	/**
 	 *
 	 * todo we need to decompose this a little: to get a channel for a username. a method

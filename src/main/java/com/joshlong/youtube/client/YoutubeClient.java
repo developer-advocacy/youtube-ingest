@@ -70,6 +70,8 @@ public interface YoutubeClient {
 	 */
 	Mono<Channel> getChannelByUsername(String username);
 
+	Mono<Channel> getChannelById(String channelId);
+
 	/**
 	 * This returns all the videos associated with a collection of {@link String}
 	 * videoIds.
