@@ -147,7 +147,7 @@ class YoutubeIngestJobRunner implements ApplicationRunner {
 						                           category_id = excluded.category_id,
 						                           view_count = excluded.view_count,
 						                           favorite_count = excluded.favorite_count,
-						                           comment_count   = excluded.comment_count,
+						                           comment_count  = excluded.comment_count,
 						                           like_count =  excluded.like_count ,
 						                           tags = excluded.tags
 						                        where
