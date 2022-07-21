@@ -14,8 +14,6 @@ import org.springframework.r2dbc.core.DatabaseClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.Function;
 
 @Slf4j
@@ -30,13 +28,16 @@ class YoutubeIngestJobRunner implements ApplicationRunner {
 
 	@Override
 	public void run(ApplicationArguments args) {
-
-		/*
-		 * 1. get all the playlists for the main channel 2. for each playlist's videos,
-		 * write the (video and playlist) into its join table and the (video and channel)
-		 * into its join table 3. get all the videos for the channel, write them, also
-		 * noting the channel and video in the correct join table
-		 */
+		// 0. reset all the flush states todo
+		// 1. get all the playlists for the main channel
+		// 2. for each playlist's videos, write the (video and playlist) into its join
+		// table and the (video and channel) into its join table
+		// 3. get all the videos for the channel, write them, also noting the channel and
+		// video in the correct join table
+		// 4. for each unique playlist_id in yt_playlist_videos, get the playlist data
+		// from the API and write it to yt_playlists todo
+		// 5. for each unique channel in yt_channel_videos, get the channel data from the
+		// API and write it to yt_channels todo
 
 		client//
 				.getChannelByUsername(this.channelUsername)//
@@ -51,17 +52,6 @@ class YoutubeIngestJobRunner implements ApplicationRunner {
 				})//
 				.subscribe();
 
-		/*
-		 * resetTablesFreshStatus()// .thenMany(writeUsernameChannel())// write the
-		 * channel uploads playlist .flatMap(channel ->
-		 * client.getAllPlaylistsByChannel(channel.channelId()).flatMap(this::
-		 * doWritePlaylist))// playlists .flatMap(playlist ->
-		 * client.getAllVideosByPlaylist(playlist.playlistId()) .flatMap(vid ->
-		 * doWritePlaylistsVideos(playlist, vid)) ) .thenMany(c ->
-		 * client.getAllVideosByUsernameUploads(channelUsername).flatMap(this::
-		 * doWriteVideo))// videos .doFinally(st -> log.info("finished..."))//
-		 * .subscribe();
-		 */
 	}
 
 	private Mono<Playlist> doWritePlaylistsVideos(Channel channel, Playlist playlist, Video video) {
@@ -187,13 +177,6 @@ class YoutubeIngestJobRunner implements ApplicationRunner {
 				.fetch()//
 				.rowsUpdated()//
 				.thenReturn(channel);
-	}
-
-	private Mono<Channel> writeUsernameChannel() {
-		return client//
-				.getChannelByUsername(this.channelUsername)//
-				.flatMap(this::doWriteChannel);
-
 	}
 
 	private Flux<Integer> resetTablesFreshStatus() {
